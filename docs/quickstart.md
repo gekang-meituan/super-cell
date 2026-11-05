@@ -36,19 +36,31 @@ super-cell/
 
 2. **修改或新增文档。** 编辑 `docs/` 下的 Markdown 文件；如果新增了文档，记得在 `README.md` 中添加指向它的相对链接。
 
-3. **检查相对链接。** 提交前确认文档中引用的本地路径都真实存在。可以用下面的脚本逐个检查 Markdown 文件的 `.md` 相对链接：
+3. **检查相对链接。** 提交前确认文档中引用的本地路径都真实存在。在仓库根目录运行下面的脚本：它会跳过带协议的外部链接（如 `https://`）、`mailto:`、协议相对地址和纯锚点，按每个文档所在目录解析本地路径，并在发现缺失时返回非零状态。
 
    ```bash
-   for file in README.md docs/*.md; do
-     grep -oE '\]\([^)]+\.md\)' "$file" \
-       | sed -E 's/^\]\(//; s/\)$//' \
-       | while read -r link; do
-           [ -e "$(dirname "$file")/$link" ] || echo "missing: $file -> $link"
-         done
-   done
+   check_links() {
+     local status=0 file dir link target
+     for file in README.md docs/*.md; do
+       dir=$(dirname "$file")
+       while IFS= read -r link; do
+         case "$link" in
+           *://*|mailto:*|//*|'#'*) continue ;;
+         esac
+         target="${link%%#*}"
+         if [ -n "$target" ] && [ ! -e "$dir/$target" ]; then
+           echo "missing: $file -> $link"
+           status=1
+         fi
+       done < <(grep -oE '\]\([^)]+\)' "$file" | sed -E 's/^\]\(//; s/\)$//')
+     done
+     return "$status"
+   }
+
+   check_links
    ```
 
-   没有任何输出即表示这些相对链接都能在本地找到。
+   全部链接都存在时脚本无输出并返回 0；存在缺失时只列出本地缺失项并返回 1。
 
 4. **提交并推送。**
 
